@@ -14,13 +14,13 @@ namespace youtube_playlist
     public class PlaylistHandler
     {
 
-        private const string apiKey = "AIzaSyAq2F5mj5gGAz_3p1GE0epBCB2OFwcx9rQ";
+        private const string apiKey = //"";
         
 
         public YoutubePlaylistDataResponce LambdaHandler(ImportDataSerializer input)
         {
-            LambdaLogger.Log(formatter(input.url));
-            return this.Run(formatter(input.url));
+            // LambdaLogger.Log(input.id);
+            return this.Run(input.id);
             // return "";
         }
 
@@ -50,37 +50,47 @@ namespace youtube_playlist
         private YoutubePlaylistDataResponce Run(string input){
             var data = new YoutubePlaylistDataResponce();
 
-            if(input.Equals("-1"))
-                return data;
+            // if(input.Equals("-1"))
+            //     return data;
 
             var service = Credentional();
 
             if(service == null) return data;
 
-            var request = service.Videos.List(new Repeatable<string>(new List<string>
+            var request = service.Playlists.List(new Repeatable<string>(new List<string>
             {
-                "snippet,contentDetails,statistics"
+                "snippet"
             }));
-
             request.Id = input;
             var response = request.Execute();
-            
-            if(response.Items == null) return data;
+            var nextPageToken = "";
+            var videoDataList = new List<VideoData>();
+            while (nextPageToken != null)
+            {
+                var playlistItemsListRequest = service.PlaylistItems.List("snippet");
+                playlistItemsListRequest.PlaylistId = input;
+                playlistItemsListRequest.MaxResults = 50;
+                playlistItemsListRequest.PageToken = nextPageToken;
 
-            var videoData = new VideoData[response.Items.Count];
-            LambdaLogger.Log($"response.Items.Count {response.Items.Count}");
+                var playlistItemsListResponse = playlistItemsListRequest.Execute();
 
-            for (int i = 0; i < response.Items.Count; i++)
-            {   
-                var snippet = response.Items[i].Snippet;
-                videoData[i] = new VideoData();
-                videoData[i].title = snippet.Title;
-                videoData[i].description = "";//snippet.Description;
-                videoData[i].id = response.Items[i].Id;
+
+                foreach (var playlistItem in playlistItemsListResponse.Items)
+                {
+                    // Console.WriteLine(String.Format("{0} ({1})", playlistItem.Snippet.Title, playlistItem.Snippet.ResourceId.VideoId));
+                    if(playlistItem.Snippet.Title.Equals("Private video") || playlistItem.Snippet.Title.Equals("Deleted video"))
+                        continue;
+                    var videoData = new VideoData();
+                    videoData.id = playlistItem.Snippet.ResourceId.VideoId;
+                    videoData.title = playlistItem.Snippet.Title;
+                    videoDataList.Add(videoData);
+                }
+
+                nextPageToken = playlistItemsListResponse.NextPageToken;
             }
 
-            data.name = "Youtube";
-            data.videos = videoData;
+            data.name = $"{response.Items[0].Snippet.Title ?? input}";
+            data.videos = videoDataList.ToArray();
 
             return data;
         
@@ -116,7 +126,7 @@ namespace youtube_playlist
 
     public class ImportDataSerializer
     {
-        [JsonProperty(PropertyName = "url")]
-        public string url {get; set;}
+        [JsonProperty(PropertyName = "id")]
+        public string id {get; set;}
     }
 }
