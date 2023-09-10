@@ -22,7 +22,7 @@ frameworkVersion: '2'
 
 provider:
   name: aws
-  runtime: dotnetcore3.1
+  runtime: dotnet6
   lambdaHashingVersion: 20201221
 
 # you can overwrite defaults here
